@@ -6,7 +6,7 @@
 
 ##Example
 
-[http://marvinwilliam.com/infinite-recycle-list/](Demo)
+[Demo](http://marvinwilliam.com/infinite-recycle-list/)
 
 ```javascript
 var _list = new InfiniteList({
