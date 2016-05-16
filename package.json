@@ -15,7 +15,7 @@
     "recycle"
   ],
   "author": "marvinwilliam",
-  // "license": "MIT",
+  "license": "ISC",
   "bugs": {
     "url": "https://github.com/MarvinWilliam/infinite-recycle-list/issues"
   },

@@ -1,0 +1,25 @@
+{
+  "name": "infinite-recycle-list",
+  "description": "Simple infinite scroll list with dom recycle for mobile web",
+  "main": "/src/infinite-recycle-list.js",
+  "authors": [
+    "marvinwilliam"
+  ],
+  "license": "ISC",
+  "keywords": [
+    "infinite",
+    "list",
+    "recycle"
+  ],
+  "homepage": "https://github.com/MarvinWilliam/infinite-recycle-list",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "zepto": "^1.1.6"
+  }
+}
