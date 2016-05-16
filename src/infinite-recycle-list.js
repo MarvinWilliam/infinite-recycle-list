@@ -41,7 +41,7 @@
             this.loadDone = options.loadDone || noop;
             this.listLoading = options.listLoading || function() {
                 return '<div>loading...</div>';
-            }
+            };
 
             if (!this.dom) {
                 console.warn('ListDom can not be null');
@@ -51,8 +51,7 @@
             //DOM 正在加载中
             this._loading = $(this.listLoading());
             //DOM 没有更多
-            this._nomore = $(listnomore).hide();
-            this._usernomore = $('<div/>');
+            this._nomore = $('<div/>');
             this._userdom = $(this.dom).append(this._listContainer).append(this._loading);
             this._pageListData = {};
             this._pageindex = 0;
@@ -64,25 +63,23 @@
         },
         _showNomore: function() {
             var _nomore = this.customnomore ? this.customnomore() : noop();
-
             if (_nomore) {
-                this._usernomore = $(_nomore);
-                this._userdom.append(this._usernomore);
-            } else {
-                this._nomore.show();
+                this._nomore = $(_nomore);
             }
+            this._userdom.append(this._nomore.show());
         },
         //初始化列表,并绑定滚动事件
         _initList: function() {
             var _this = this;
-            $(window).on('scroll', function() {
-                var bottom = window.screen.height + window.scrollY;
 
+            function listener() {
+                var bottom = window.innerHeight + window.scrollY;
                 if (bottom >= _this._listContainer.height() - _this.threshold && !_this._renderingsign && !_this._nomoretag) {
                     _this._loadPage();
                 }
                 _this._updatePage();
-            });
+            }
+            $(window).on('scroll', listener);
             _this._loadPage();
         },
         //增量加载更多页面
@@ -105,7 +102,8 @@
         },
         //获取当前视窗页码
         _getPageItemOffset: function(pageheight) {
-            return this._listContainer.scrollTop() === 0 ? 0 : Math.floor((this._listContainer.scrollTop() + window.screen.height / 2) / pageheight);
+            var curScroll = document.body.scrollTop;
+            return curScroll === 0 ? 0 : Math.floor((curScroll - this._listContainer.offset().top + window.innerHeight / 2) / pageheight);
         },
         //更新页面,并回收页面
         _updatePage: function() {
@@ -163,6 +161,8 @@
         },
         //回收当前页上方2页之前的DOM,并删除当前页下方2页之后的DOM
         _recyclePage: function(recyclepages, deletepages) {
+            var _this = this;
+
             recyclepages.each(function() {
                 var _dom = $(this);
                 if (!_dom.hasClass('recycle')) {
@@ -173,14 +173,19 @@
             });
 
             //是否回收列表数据
-            if (this._recycle) {
-                deletepages.each(function() {
-                    var _dom = $(this),
-                        _index = _dom.data('page');
 
-                    delete this._pageListData[_index];
-                });
-            }
+            deletepages.each(function() {
+                var _dom = $(this),
+                    _index = _dom.data('page');
+
+                if (_this._pageindex >= ~~_dom.data('page')) {
+                    _this._pageindex = ~~_dom.data('page') - 1;
+                }
+                if (_this._recycle) {
+                    delete _this._pageListData[_index];
+                }
+            });
+
 
             //尾部的页面删除
             deletepages.remove();
@@ -206,8 +211,7 @@
             this._pageindex = 0;
             this._pageListData = {};
             this._nomoretag = false;
-            this._nomore.hide();
-            this._usernomore.remove();
+            this._nomore.remove();
             this._loadPage();
         }
     };

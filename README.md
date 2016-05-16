@@ -6,7 +6,7 @@
 
 ##Example
 
-[](Demo)
+[http://marvinwilliam.com/infinite-recycle-list/](Demo)
 
 ```javascript
 var _list = new InfiniteList({
@@ -56,11 +56,11 @@ var _list = new InfiniteList({
 ####reloadData
 重新加载指定页面的数据
 ```html
-<ul id="list-container">
+<div id="list-container">
     ...
         <li class="list-item-11"></li>
     ...
-</ul>
+</div>
 ```
 
 ```javascript
