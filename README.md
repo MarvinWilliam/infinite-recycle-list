@@ -2,7 +2,12 @@
 
 根据淘宝移动端增量加载列表改造而来,实现列表的增量加载,并对超出屏幕的列表页进行回收.
 
-依赖于zepto或者jquery
+依赖于zepto或者jquery.
+
+##Install
+```
+$ bower install infinite-cycle-list --save
+```
 
 ##Example
 
