@@ -37,7 +37,7 @@ var _list = new InfiniteList({
     return 'template-rendered';
   },
   //可选,每页的大小
-  pagesize:20,
+  pageSize:20,
   //可选,增量加载触发值
   threshold:200,
   //可选,向上滑动时,屏幕下方的数据是否销毁
