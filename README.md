@@ -17,6 +17,8 @@ $ bower install infinite-recycle-list --save
 var _list = new InfiniteList({
   //必须,列表容器的选择器
   listDom:'#list-container',
+  //必须,每页的大小,控制是否可以加载更多,和dataLoader里的页面大小需要保持一致
+  pageSize:20,
   //必须,数据加载函数
   dataLoader:function(pageindex,success_calbak,error_calbak){
     $.ajax({
@@ -36,8 +38,6 @@ var _list = new InfiniteList({
   htmlRender:function(data){
     return 'template-rendered';
   },
-  //可选,每页的大小
-  pageSize:20,
   //可选,增量加载触发值
   threshold:200,
   //可选,向上滑动时,屏幕下方的数据是否销毁
