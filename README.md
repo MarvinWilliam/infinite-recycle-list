@@ -6,7 +6,7 @@
 
 ##Install
 ```
-$ bower install infinite-cycle-list --save
+$ bower install infinite-recycle-list --save
 ```
 
 ##Example
