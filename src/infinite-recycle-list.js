@@ -165,7 +165,6 @@
                 }
             });
         },
-        //回收当前页上方2页之前的DOM,并删除当前页下方2页之后的DOM
         _recyclePage: function(recyclepages, deletepages) {
             var _this = this;
 
