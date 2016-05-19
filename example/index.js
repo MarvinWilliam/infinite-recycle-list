@@ -21,7 +21,7 @@
             });
             return result;
         },
-        pagesize: 20,
+        pageSize: 20,
         recycle: true
     });
 
