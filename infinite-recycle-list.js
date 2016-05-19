@@ -8,12 +8,13 @@
      *          //必须参数
      *          listDom:String,//列表容器的筛选名称
      *          dataLoader:Function(pageindex,success_calbak,error_calbak),//数据接口
+     *          pageSize:Number,//列表有无更多
      *          htmlRender:Function(data),//模版拼接,用户返回用模版绑定过的数据
      *          
      *          //可选参数
-     *          pagesize:Number,//列表每页元素数量
      *          threshold:Number,//增量加载出发值,默认为300像素
-     *          recycle:Boolean,//用户向上滑动列表,是否保留尾部的缓存数据
+     *          pageKeepSize:Number,//保持的DOM数量,最低为2(建议为偶数),默认为6
+     *          recycle:Boolean,//用户向上滑动列表,是否保留尾部的缓存数据,默认为false
      *          customNomore:Function,//用户自定义空列表显示内容
      *          listLoading:Function,//列表加载中模版
      *          loadDone:Function//每页数据加载完成回调
@@ -32,13 +33,19 @@
     infinitelist.prototype = {
         setOptions: function(options) {
             this.dom = options.listDom || '';
-            this.pagesize = options.pageSize || 10;
-            this.threshold = options.threshold || 300;
-            this._recycle = !!options.recycle;
+            this.pagesize = options.pageSize;
             this.dataloader = options.dataLoader || noop;
             this.htmlrender = options.htmlRender || noop;
-            this.customnomore = options.customNomore;
+
+            this.threshold = options.threshold || 300;
+            this._listPageKeepLength = options.pageKeepSize >= 2 ? options.pageKeepSize : 6;
+            this._recycle = !!options.recycle;
             this.loadDone = options.loadDone || noop;
+            //没有更多
+            this._nomore = options.customNomore || function() {
+                return '<div></div>';
+            };
+            this.nomore = undefined;
             this.listLoading = options.listLoading || function() {
                 return '<div>loading...</div>';
             };
@@ -47,11 +54,15 @@
                 console.warn('ListDom can not be null');
                 return;
             }
+
+            if (this.pagesize === undefined) {
+                console.warn('PageSize can not be null');
+                return;
+            }
+            //列表容器
             this._listContainer = $('<ul/>', { class: 'infinitelist-container' });
             //DOM 正在加载中
             this._loading = $(this.listLoading());
-            //DOM 没有更多
-            this._nomore = $('<div/>');
             this._userdom = $(this.dom).append(this._listContainer).append(this._loading);
             this._pageListData = {};
             this._pageindex = 0;
@@ -62,11 +73,8 @@
             this._initList();
         },
         _showNomore: function() {
-            var _nomore = this.customnomore ? this.customnomore() : noop();
-            if (_nomore) {
-                this._nomore = $(_nomore);
-            }
-            this._userdom.append(this._nomore.show());
+            this.nomore = $(this._nomore()).show();
+            this._userdom.append(this.nomore);
         },
         //初始化列表,并绑定滚动事件
         _initList: function() {
@@ -110,11 +118,17 @@
             var pages = this._listContainer.find('.infinitelist-page'),
                 curindex = this._getPageItemOffset(pages.first().height()),
                 firstpage = pages.first().data('page'),
-                curpage = curindex + firstpage;
-            //先回收页面
-            this._recyclePage(pages.slice(0, curpage > 2 ? curpage - 2 : 0), pages.slice(curpage > 2 ? curpage + 2 : 0, curpage > 2 ? this._pageindex : 0));
-            //恢复页面
-            this._resumePage(pages.slice(curpage > 2 ? curpage - 2 : 0, curpage + 2));
+                curpage = curindex + firstpage,
+                keepsize = Math.floor(this._listPageKeepLength / 2);
+            if (pages.length > this._listPageKeepLength) {
+                //先回收页面,再恢复页面
+                var startindex = ((curpage + keepsize) > pages.length) ? curpage - 2 * keepsize : curpage - keepsize;
+                this._recyclePage(pages.slice(0, startindex),
+                    pages.slice(curpage + keepsize, pages.length));
+                this._resumePage(pages.slice(startindex, curpage + keepsize));
+            } else {
+                this._resumePage(pages);
+            }
         },
         _getPageDom: function(pageindex, calbak) {
             var _this = this;
@@ -159,7 +173,6 @@
                 }
             });
         },
-        //回收当前页上方2页之前的DOM,并删除当前页下方2页之后的DOM
         _recyclePage: function(recyclepages, deletepages) {
             var _this = this;
 
@@ -186,7 +199,6 @@
                 }
             });
 
-
             //尾部的页面删除
             deletepages.remove();
         },
@@ -211,7 +223,9 @@
             this._pageindex = 0;
             this._pageListData = {};
             this._nomoretag = false;
-            this._nomore.remove();
+            if (this.nomore) {
+                this.nomore.remove();
+            }
             this._loadPage();
         }
     };
