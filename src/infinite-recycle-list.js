@@ -13,7 +13,8 @@
      *          
      *          //可选参数
      *          threshold:Number,//增量加载出发值,默认为300像素
-     *          recycle:Boolean,//用户向上滑动列表,是否保留尾部的缓存数据
+     *          pageKeepSize:Number,//保持的DOM数量,最低为2(建议为偶数),默认为6
+     *          recycle:Boolean,//用户向上滑动列表,是否保留尾部的缓存数据,默认为false
      *          customNomore:Function,//用户自定义空列表显示内容
      *          listLoading:Function,//列表加载中模版
      *          loadDone:Function//每页数据加载完成回调
@@ -37,6 +38,7 @@
             this.htmlrender = options.htmlRender || noop;
 
             this.threshold = options.threshold || 300;
+            this._listPageKeepLength = options.pageKeepSize >= 2 ? options.pageKeepSize : 6;
             this._recycle = !!options.recycle;
             this.loadDone = options.loadDone || noop;
             //没有更多
@@ -57,7 +59,7 @@
                 console.warn('PageSize can not be null');
                 return;
             }
-
+            //列表容器
             this._listContainer = $('<ul/>', { class: 'infinitelist-container' });
             //DOM 正在加载中
             this._loading = $(this.listLoading());
@@ -116,11 +118,17 @@
             var pages = this._listContainer.find('.infinitelist-page'),
                 curindex = this._getPageItemOffset(pages.first().height()),
                 firstpage = pages.first().data('page'),
-                curpage = curindex + firstpage;
-            //先回收页面
-            this._recyclePage(pages.slice(0, curpage > 2 ? curpage - 2 : 0), pages.slice(curpage > 2 ? curpage + 2 : 0, curpage > 2 ? this._pageindex : 0));
-            //恢复页面
-            this._resumePage(pages.slice(curpage > 2 ? curpage - 2 : 0, curpage + 2));
+                curpage = curindex + firstpage,
+                keepsize = Math.floor(this._listPageKeepLength / 2);
+            if (pages.length > this._listPageKeepLength) {
+                //先回收页面,再恢复页面
+                var startindex = ((curpage + keepsize) > pages.length) ? curpage - 2 * keepsize : curpage - keepsize;
+                this._recyclePage(pages.slice(0, startindex),
+                    pages.slice(curpage + keepsize, pages.length));
+                this._resumePage(pages.slice(startindex, curpage + keepsize));
+            } else {
+                this._resumePage(pages);
+            }
         },
         _getPageDom: function(pageindex, calbak) {
             var _this = this;

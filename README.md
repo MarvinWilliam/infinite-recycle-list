@@ -38,9 +38,11 @@ var _list = new InfiniteList({
   htmlRender:function(data){
     return 'template-rendered';
   },
-  //可选,增量加载触发值
+  //增量加载出发值,默认为300像素
   threshold:200,
-  //可选,向上滑动时,屏幕下方的数据是否销毁
+  //保持的DOM数量,最低为2(建议为偶数),默认为6
+  pageKeepSize:6,
+  //用户向上滑动列表,是否保留尾部的缓存数据,默认为false
   recycle:true,
   //可选,用户自定义列表没有更多显示的内容
   customNomore:function(){
