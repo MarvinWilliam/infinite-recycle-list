@@ -13,7 +13,7 @@
     }
 
     function _listnomore() {
-        return '<div style="text-align: center;">No more</div>';
+        return '<div style="text-align: center;padding: 10px 0;">No more</div>';
     }
 
     /**
@@ -36,6 +36,7 @@
      *      listNomore:Function,  //Return html string that used for list with no data.
      *      listLoading:String,   //Html string that used for list bottom loading tag.
      *      loadDone:Function,  //Triggered when each page finish loading.
+     *      storageName:String  //List data stored in sessionStorage with the given name,default INFINITELISTCACHE.
      * }
      *
      * @method public
@@ -71,20 +72,20 @@
             this._htmlRender = options.htmlRender;
 
             this._pageSize = options.pageSize || 10;
-            this._threshold = options.threshold || 300;
+            this._threshold = options.threshold > 300 ? options.threshold : 300;
             this._pageKeepSize = options.pageKeepSize || 6;
             this._recycle = !!options.recycle;
             this._pageCache = !!options.pageCache;
             this._listNomore = options.listNomore || _listnomore;
-            this._listLoading = $(options.listLoading || '<div style="text-align: center;">Loading...</div>');
+            this._listLoading = $(options.listLoading || '<div style="text-align: center;padding: 10px 0;">Loading...</div>');
             this._loadDone = options.loadDone || noop;
+            this._cacheKey = options.storageName || 'INFINITELISTCACHE';
 
             this._pageIndex = 1;
             this._pageListData = {};
-            //Block sign,when page is rendering,block scroll listener.
+            //Block sign,when page is rendering block scroll listener.
             this._sign_rendering = false;
             this._sign_nomore = false;
-            this._cacheKey = 'INFINITELISTCACHE';
 
             this._initList();
         },
@@ -95,11 +96,13 @@
 
             function listener() {
                 var bottom = self._listContainer.height() + self._listContainer.offset().top;
-                if ((self._threshold < bottom - window.scrollY - window.innerHeight) && !self._sign_rendering && !self._sign_nomore) {
+                if ((self._threshold > bottom - window.scrollY - window.innerHeight) && !self._sign_rendering && !self._sign_nomore) {
                     self._loadPage();
                 }
                 self._updatePage(function () {
-                    self._cacheData();
+                    if (self._pageCache) {
+                        self._cacheData();
+                    }
                 });
             }
 
@@ -115,15 +118,16 @@
             var self = this;
 
             function getPage(index, page, calbak) {
+                var _dom = $('<div/>', {
+                    'class': 'infinitelist-page infinitelist-pageindex' + index + ' recycled',
+                    'data-page': index
+                });
                 if (page.cycled) {
-                    calbak($('<div/>', {
-                        'class': 'recycled infinitelist-page infinitelist-pageindex' + index,
-                        'data-page': index
-                    }).css('height', page.data));
+                    calbak(_dom.css('height', page.data));
                 } else {
                     self._pageListData[index] = page.data;
                     self._getPageDom(index, function (_renderhtml) {
-                        calbak(_renderhtml);
+                        calbak(_dom.html(_renderhtml));
                     });
                 }
             }
@@ -136,7 +140,9 @@
                     getPage(~~proname, _item, function (dom) {
                         self._listContainer.append(dom);
                     });
+                    self._pageIndex = ~~proname + 1;
                 }
+                sessionStorage.removeItem(self._cacheKey);
             } else {
                 this._loadPage();
             }
@@ -166,7 +172,6 @@
                     'class': 'infinitelist-page infinitelist-pageindex' + pageindex,
                     'data-page': pageindex
                 }).html(_renderhtml));
-                //页面加载完成,可以接受后续请求
                 self._sign_rendering = false;
                 self._loadDone();
             });
@@ -178,7 +183,6 @@
             var pages    = this._listContainer.find('.infinitelist-page'),
                 curpage  = this._getPageItemOffset(pages.first().height()),
                 keepsize = Math.ceil(this._pageKeepSize / 2);
-            console.log('current page:' + curpage);
             if (pages.length > this._pageKeepSize) {
                 this._recyclePage(pages.slice(0, curpage - keepsize), pages.slice(curpage + keepsize, pages.length));
                 this._resumePage(pages.slice(curpage - keepsize, curpage + keepsize));
@@ -201,7 +205,8 @@
             });
         },
         _recyclePage: function (recyclepages, deletepages) {
-            var self = this;
+            var self     = this,
+                delpages = [];
             recyclepages.each(function () {
                 var _dom = $(this);
                 if (!_dom.hasClass('recycled')) {
@@ -214,14 +219,17 @@
             deletepages.each(function () {
                 var _dom   = $(this),
                     _index = _dom.data('page');
-
-                if (self._pageIndex >= ~~_index) {
-                    self._pageIndex = ~~_index - 1;
-                }
+                delpages.push(_index);
                 if (self._recycle) {
                     delete self._pageListData[_index];
                 }
             });
+
+            if (delpages.length > 0) {
+                self._pageIndex = delpages.reduce(function (prev, cur) {
+                    return prev > cur ? cur : prev;
+                });
+            }
 
             deletepages.remove();
         },
