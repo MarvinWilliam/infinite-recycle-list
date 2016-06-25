@@ -26,6 +26,11 @@
         pageCache: true
     });
 
+    $('#reload').on('click', function (event) {
+        event.stopImmediatePropagation();
+        _list.reloadData();
+    });
+    
     $('#clear').on('click', function (event) {
         event.stopImmediatePropagation();
         _list.clear();

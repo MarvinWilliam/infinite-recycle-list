@@ -177,11 +177,25 @@
             });
         },
         _getPageItemOffset: function (pageheight) {
-            return Math.ceil((window.scrollY + window.innerHeight / 2 - this._listContainer.offset().top) / pageheight);
+            var curpage = (window.scrollY + window.innerHeight / 2 - this._listContainer.offset().top) / pageheight;
+
+            if (pageheight > window.innerHeight) {
+                var prop  = 1 - window.innerHeight / pageheight,
+                    _temp = Math.floor(curpage);
+
+                if (_temp + 0.5 + prop > curpage && _temp + 0.5 - prop < curpage) {
+                    curpage = _temp;
+                }
+            }
+
+            return {
+                min: Math.floor(curpage),
+                max: Math.ceil(curpage)
+            };
         },
         _updatePage: function (calbak) {
             var pages    = this._listContainer.find('.infinitelist-page'),
-                curpage  = this._getPageItemOffset(pages.first().height()),
+                curpage  = this._getPageItemOffset(pages.first().height()).max,
                 keepsize = Math.ceil(this._pageKeepSize / 2);
             if (pages.length > this._pageKeepSize) {
                 this._recyclePage(pages.slice(0, curpage - keepsize), pages.slice(curpage + keepsize, pages.length));
@@ -263,14 +277,24 @@
             }
         },
         reloadData: function () {
-            var self    = this,
-                curpage = self._getPageItemOffset($('.infinitelist-page').first().height());
-            if (curpage > 0) {
-                //删除当前页数据
-                delete self._pageListData[curpage];
-                self._getPageDom(curpage, function (_renderhtml) {
-                    $('.infinitelist-pageindex' + curpage).html(_renderhtml);
-                });
+            var self     = this,
+                curpages = self._getPageItemOffset($('.infinitelist-page').first().height());
+            console.log(curpages);
+            if (curpages.min > 0 && curpages.max > 0) {
+                delete self._pageListData[curpages.min];
+                delete self._pageListData[curpages.max];
+                if (curpages.max === curpages.min) {
+                    self._getPageDom(curpages.min, function (_renderhtml) {
+                        $('.infinitelist-pageindex' + curpages.min).html(_renderhtml);
+                    });
+                } else {
+                    self._getPageDom(curpages.min, function (_renderhtml) {
+                        $('.infinitelist-pageindex' + curpages.min).html(_renderhtml);
+                    });
+                    self._getPageDom(curpages.max, function (_renderhtml) {
+                        $('.infinitelist-pageindex' + curpages.max).html(_renderhtml);
+                    });
+                }
             }
         },
         clear: function () {
