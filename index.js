@@ -1,36 +1,37 @@
-(function() {
+(function () {
     var _list = new InfiniteList({
-        listDom: '#list-container',
-        dataLoader: function(pageindex, success_calbak, error_calbak) {
-            setTimeout(function() {
+        listId: 'list-container',
+        dataLoader: function (pageindex, pagesize, success_calbak, error_calbak) {
+            setTimeout(function () {
                 var result = [],
-                    index = 0;
-                for (; index < 20; index++) {
+                    index  = 0;
+                for (; index < pagesize; index++) {
                     result[index] = {
-                        index: pageindex * 100 + index,
+                        index: (pageindex - 1) * pagesize + index,
                         date: new Date().getTime()
                     };
                 }
                 success_calbak(result);
             }, 300);
         },
-        htmlRender: function(datalist) {
+        htmlRender: function (datalist) {
             var result = '';
-            datalist.forEach(function(item, index) {
+            datalist.forEach(function (item, index) {
                 result += '<li>' + item.index + '&nbsp;&nbsp;&nbsp;' + item.date + '</li>';
             });
             return result;
         },
-        pageSize: 20,
-        recycle: true
+        pageSize: 10,
+        recycle: true,
+        pageCache: true
     });
 
-    $('#clear').on('click', function(event) {
+    $('#clear').on('click', function (event) {
         event.stopImmediatePropagation();
         _list.clear();
     });
 
-    $('#list-container').on('click', 'li', function() {
-        _list.reloadData($(this));
+    $('#list-container').on('click', 'li', function () {
+        window.location.href = '/infinite-recycle-list/detail.html';
     });
 })();
