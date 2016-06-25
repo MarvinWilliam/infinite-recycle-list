@@ -16,7 +16,7 @@ $ bower install infinite-recycle-list --save
 ```javascript
 var _list = new InfiniteList({
   //必须,列表容器的选择器
-  listId:'#list-container',
+  listId:'list-container',
   //必须,每页的大小,控制是否可以加载更多,和dataLoader里的页面大小需要保持一致
   pageSize:10,
   //必须,数据加载函数

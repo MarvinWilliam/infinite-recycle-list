@@ -67,7 +67,8 @@
                 return;
             }
 
-            this._listWrap = $('#' + options.listId);
+            var _listId = options.listId.indexOf('#') > -1 ? options.listId : '#' + options.listId;
+            this._listWrap = $(_listId);
             this._dataLoader = options.dataLoader;
             this._htmlRender = options.htmlRender;
 

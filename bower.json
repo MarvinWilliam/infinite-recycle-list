@@ -2,7 +2,7 @@
   "name": "infinite-recycle-list",
   "description": "Simple infinite scroll list with dom recycle for mobile web",
   "main": "/dist/infinite-recycle-list.min.js",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "authors": [
     "marvinwilliam"
   ],
