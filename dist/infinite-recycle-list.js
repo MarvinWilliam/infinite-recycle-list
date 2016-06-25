@@ -1,234 +1,313 @@
-(function() {
-    function noop() {}
+(function (infinitelist) {
+    if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
+        define(function () {
+            return infinitelist;
+        });
+    } else if (typeof module !== 'undefined' && module.exports) {
+        module.exports = infinitelist;
+    } else {
+        window.InfiniteList = infinitelist;
+    }
+})((function () {
+    function noop() {
+    }
+
+    function _listnomore() {
+        return '<div style="text-align: center;padding: 10px 0;">No more</div>';
+    }
 
     /**
-     * 自动回收的增量加载列表
-     * @param options
-     *      {
-     *          //必须参数
-     *          listDom:String,//列表容器的筛选名称
-     *          dataLoader:Function(pageindex,success_calbak,error_calbak),//数据接口
-     *          pageSize:Number,//列表有无更多
-     *          htmlRender:Function(data),//模版拼接,用户返回用模版绑定过的数据
-     *          
-     *          //可选参数
-     *          threshold:Number,//增量加载出发值,默认为300像素
-     *          pageKeepSize:Number,//保持的DOM数量,最低为2(建议为偶数),默认为6
-     *          recycle:Boolean,//用户向上滑动列表,是否保留尾部的缓存数据,默认为false
-     *          customNomore:Function,//用户自定义空列表显示内容
-     *          listLoading:Function,//列表加载中模版
-     *          loadDone:Function//每页数据加载完成回调
      *
-     *          //对外方法
-     *          reloadData:Function,//刷新指定dom页的数据
-     *          clear:Function//清空列表,并重新加载数据
-     *      }
+     * @param options
+     * {
+     *      //options(require)
+     *      listId:String,  //Id of list container.
+     *      dataLoader:Function(pageindex,pagesize,success_calbak,err_calbak),   //Function of data provider.
+     *      htmlRender:Function(data,calbak)    //Template render,calbak with html string after finish render.
+     *
+     *      //options(optional)
+     *      pageSize:Number,    //List item count of each page,default 10.
+     *      threshold:Number,   //Infinite load trigger pixel height,default 300 pixel(should large than 300).
+     *      pageKeepSize:Number,    //Dom count keep in page which not be recycled,default 6(minimum of 2,should be
+     *     even number).
+     *      recycle:Boolean,    //Should list keep bottom data in cache,defaule false.
+     *      pageCache:Boolean,  //Should list cache current page data if page changed,this would resume page when
+     *     reload,default false.
+     *      listNomore:Function,  //Return html string that used for list with no data.
+     *      listLoading:String,   //Html string that used for list bottom loading tag.
+     *      loadDone:Function,  //Triggered when each page finish loading.
+     *      storageName:String  //List data stored in sessionStorage with the given name,default INFINITELISTCACHE.
+     * }
+     *
+     * @method public
+     *
+     * reloadData:Function, //Reload page data.
+     * clear:Function,  //Clear list data.
      */
     function infinitelist(options) {
-        if (options) {
-            this.setOptions(options);
+        if (!options) {
+            console.warn('Infinitelist init options can not be null!');
+            return;
         }
+        this._setOptions(options);
     }
 
     infinitelist.prototype = {
-        setOptions: function(options) {
-            this.dom = options.listDom || '';
-            this.pagesize = options.pageSize;
-            this.dataloader = options.dataLoader || noop;
-            this.htmlrender = options.htmlRender || noop;
+        _setOptions: function (options) {
+            if (!options.listId) {
+                console.warn('Options-listId can not be null!');
+                return;
+            }
+            if (!options.dataLoader) {
+                console.warn('Options-dataLoader can not be null!');
+                return;
+            }
+            if (!options.htmlRender) {
+                console.warn('Options-htmlRender can not be null!');
+                return;
+            }
 
-            this.threshold = options.threshold || 300;
-            this._listPageKeepLength = options.pageKeepSize >= 2 ? options.pageKeepSize : 6;
+            var _listId = options.listId.indexOf('#') > -1 ? options.listId : '#' + options.listId;
+            this._listWrap = $(_listId);
+            this._dataLoader = options.dataLoader;
+            this._htmlRender = options.htmlRender;
+
+            this._pageSize = options.pageSize || 10;
+            this._threshold = options.threshold || 300;
+            this._pageKeepSize = options.pageKeepSize || 6;
             this._recycle = !!options.recycle;
-            this.loadDone = options.loadDone || noop;
-            //没有更多
-            this._nomore = options.customNomore || function() {
-                return '<div></div>';
-            };
-            this.nomore = undefined;
-            this.listLoading = options.listLoading || function() {
-                return '<div>loading...</div>';
-            };
+            this._pageCache = !!options.pageCache;
+            this._listNomore = options.listNomore || _listnomore;
+            this._listLoading = $(options.listLoading || '<div style="text-align: center;padding: 10px 0;">Loading...</div>');
+            this._loadDone = options.loadDone || noop;
+            this._cacheKey = options.storageName || 'INFINITELISTCACHE';
 
-            if (!this.dom) {
-                console.warn('ListDom can not be null');
-                return;
-            }
-
-            if (this.pagesize === undefined) {
-                console.warn('PageSize can not be null');
-                return;
-            }
-            //列表容器
-            this._listContainer = $('<ul/>', { class: 'infinitelist-container' });
-            //DOM 正在加载中
-            this._loading = $(this.listLoading());
-            this._userdom = $(this.dom).append(this._listContainer).append(this._loading);
+            this._pageIndex = 1;
             this._pageListData = {};
-            this._pageindex = 0;
-            //是否正在render页面,如果在render页面则拒绝滚动事件
-            this._renderingsign = false;
-            this._nomoretag = false;
+            //Block sign,when page is rendering block scroll listener.
+            this._sign_rendering = false;
+            this._sign_nomore = false;
 
             this._initList();
         },
-        _showNomore: function() {
-            this.nomore = $(this._nomore()).show();
-            this._userdom.append(this.nomore);
-        },
-        //初始化列表,并绑定滚动事件
-        _initList: function() {
-            var _this = this;
+        _initList: function () {
+            var self = this;
+            self._listContainer = $('<div/>', {class: 'infinitelist-container'});
+            self._listWrap.append(self._listContainer).append(self._listLoading);
 
             function listener() {
-                var bottom = window.innerHeight + window.scrollY;
-                if (bottom >= _this._listContainer.height() - _this.threshold && !_this._renderingsign && !_this._nomoretag) {
-                    _this._loadPage();
+                var bottom = self._listContainer.height() + self._listContainer.offset().top;
+                if ((self._threshold > bottom - window.scrollY - window.innerHeight) && !self._sign_rendering && !self._sign_nomore) {
+                    self._loadPage();
                 }
-                _this._updatePage();
+                self._updatePage(function () {
+                    if (self._pageCache) {
+                        self._cacheData();
+                    }
+                });
             }
+
             $(window).on('scroll', listener);
-            _this._loadPage();
+
+            if (self._pageCache) {
+                self._resumeData();
+            } else {
+                self._loadPage();
+            }
         },
-        //增量加载更多页面
-        _loadPage: function() {
-            var _this = this;
+        _resumeData: function () {
+            var self = this;
+
+            function getPage(index, page, calbak) {
+                var _dom = $('<div/>', {
+                    'class': 'infinitelist-page infinitelist-pageindex' + index + ' recycled',
+                    'data-page': index
+                });
+                if (page.cycled) {
+                    calbak(_dom.css('height', page.data));
+                } else {
+                    self._pageListData[index] = page.data;
+                    self._getPageDom(index, function (_renderhtml) {
+                        calbak(_dom.html(_renderhtml));
+                    });
+                }
+            }
+
+            if (sessionStorage && sessionStorage.getItem(this._cacheKey)) {
+                var _cacheData = JSON.parse(sessionStorage.getItem(this._cacheKey)),
+                    proname    = '';
+                for (proname in _cacheData) {
+                    var _item = _cacheData[proname];
+                    getPage(~~proname, _item, function (dom) {
+                        self._listContainer.append(dom);
+                    });
+                    self._pageIndex = ~~proname + 1;
+                }
+                sessionStorage.removeItem(self._cacheKey);
+            } else {
+                this._loadPage();
+            }
+        },
+        _cacheData: function () {
+            if (sessionStorage) {
+                var _tempCache = {},
+                    self       = this;
+                $('.infinitelist-page').each(function () {
+                    var _pageindex = $(this).data('page'),
+                        _cycled    = $(this).hasClass('recycled');
+                    _tempCache[_pageindex] = {
+                        cycled: _cycled,
+                        data: _cycled ? $(this).css('height') : self._pageListData[_pageindex]
+                    };
+                });
+                sessionStorage.setItem(self._cacheKey, JSON.stringify(_tempCache));
+            }
+        },
+        _loadPage: function () {
+            var self      = this,
+                pageindex = self._pageIndex++;
             //正在加载页面,阻止其他的页面滚动请求
-            _this._renderingsign = true;
-            _this._pageindex++;
-            _this._loading.hide();
-            _this._getPageDom(_this._pageindex, function(renderhtml) {
-                _this._listContainer.append($('<div/>', {
-                    'class': 'infinitelist-page infinitelist-pageindex' + _this._pageindex,
-                    'data-page': _this._pageindex
-                }).append(renderhtml));
-                //页面加载完成,可以接受后续请求
-                _this._renderingsign = false;
-                _this._loading.hide();
-                _this.loadDone();
+            self._sign_rendering = true;
+            self._getPageDom(pageindex, function (_renderhtml) {
+                self._listContainer.append($('<div/>', {
+                    'class': 'infinitelist-page infinitelist-pageindex' + pageindex,
+                    'data-page': pageindex
+                }).html(_renderhtml));
+                self._sign_rendering = false;
+                self._loadDone();
             });
         },
-        //获取当前视窗页码
-        _getPageItemOffset: function(pageheight) {
-            var curScroll = document.body.scrollTop;
-            return curScroll === 0 ? 0 : Math.floor((curScroll - this._listContainer.offset().top + window.innerHeight / 2) / pageheight);
+        _getPageItemOffset: function (pageheight) {
+            var curpage = (window.scrollY + window.innerHeight / 2 - this._listContainer.offset().top) / pageheight;
+
+            if (pageheight > window.innerHeight) {
+                var prop  = 1 - window.innerHeight / pageheight,
+                    _temp = Math.floor(curpage);
+
+                if (_temp + 0.5 + prop > curpage && _temp + 0.5 - prop < curpage) {
+                    curpage = _temp;
+                }
+            }
+
+            return {
+                min: Math.floor(curpage),
+                max: Math.ceil(curpage)
+            };
         },
-        //更新页面,并回收页面
-        _updatePage: function() {
-            var pages = this._listContainer.find('.infinitelist-page'),
-                curindex = this._getPageItemOffset(pages.first().height()),
-                firstpage = pages.first().data('page'),
-                curpage = curindex + firstpage,
-                keepsize = Math.floor(this._listPageKeepLength / 2);
-            if (pages.length > this._listPageKeepLength) {
-                //先回收页面,再恢复页面
-                var startindex = ((curpage + keepsize) > pages.length) ? curpage - 2 * keepsize : curpage - keepsize;
-                this._recyclePage(pages.slice(0, startindex),
-                    pages.slice(curpage + keepsize, pages.length));
-                this._resumePage(pages.slice(startindex, curpage + keepsize));
+        _updatePage: function (calbak) {
+            var pages    = this._listContainer.find('.infinitelist-page'),
+                curpage  = this._getPageItemOffset(pages.first().height()).max,
+                keepsize = Math.ceil(this._pageKeepSize / 2);
+            if (pages.length > this._pageKeepSize) {
+                this._recyclePage(pages.slice(0, curpage - keepsize), pages.slice(curpage + keepsize, pages.length));
+                this._resumePage(pages.slice(curpage - keepsize, curpage + keepsize));
             } else {
                 this._resumePage(pages);
             }
+            calbak();
         },
-        _getPageDom: function(pageindex, calbak) {
-            var _this = this;
-            _this._getData(pageindex, function(data) {
-                calbak(_this.htmlrender(data));
+        _resumePage: function (pages) {
+            var self = this;
+            pages.each(function () {
+                var _dom = $(this);
+                if (_dom.hasClass('recycled')) {
+                    self._getPageDom(_dom.data('page'), function (_renderhtml) {
+                        _dom.html(_renderhtml);
+                        _dom.css('height', 'auto');
+                        _dom.removeClass('recycled');
+                    });
+                }
             });
         },
-        _getData: function(pageindex, calbak) {
-            var _this = this;
+        _recyclePage: function (recyclepages, deletepages) {
+            var self     = this,
+                delpages = [];
+            recyclepages.each(function () {
+                var _dom = $(this);
+                if (!_dom.hasClass('recycled')) {
+                    _dom.addClass('recycled');
+                    _dom.css('height', _dom.height());
+                    _dom.html('');
+                }
+            });
+
+            deletepages.each(function () {
+                var _dom   = $(this),
+                    _index = _dom.data('page');
+                delpages.push(_index);
+                if (self._recycle) {
+                    delete self._pageListData[_index];
+                }
+            });
+
+            if (delpages.length > 0) {
+                self._pageIndex = delpages.reduce(function (prev, cur) {
+                    return prev > cur ? cur : prev;
+                });
+            }
+
+            deletepages.remove();
+        },
+        _getPageDom: function (pageindex, calbak) {
+            var self = this;
+            self._getData(pageindex, function (data) {
+                calbak(self._htmlRender(data));
+            });
+        },
+        _getData: function (pageindex, calbak) {
+            var self = this;
             //如果缓存中存在数据则直接取缓存中的数据,没有请求服务器,并保存在缓存中
-            if (_this._pageListData[pageindex]) {
-                calbak(_this._pageListData[pageindex]);
+            if (self._pageListData[pageindex]) {
+                calbak(self._pageListData[pageindex]);
             } else {
-                _this._loading.show();
-                _this.dataloader(pageindex, function success(datalist) {
-                    if (_this._pageindex === 1 && datalist.length == 0) {
-                        _this._loading.hide();
-                        _this._showNomore();
-                        _this._nomoretag = true;
+                self._dataLoader(pageindex, self._pageSize, function success(datalist) {
+                    if (pageindex === 1 && datalist.length === 0) {
+                        self._listContainer.append($(self._listNomore()));
                     }
-                    if (datalist.length < _this.pagesize) {
-                        _this._nomoretag = true;
+                    if (datalist.length < self._pageSize) {
+                        self._listLoading.hide();
+                        self._nomoretag = true;
                     }
-                    _this._pageListData[pageindex] = datalist;
+                    if (datalist.length != 0) {
+                        self._pageListData[pageindex] = datalist;
+                    }
                     calbak(datalist);
                 }, function error() {
                     calbak([]);
                 });
             }
         },
-        _resumePage: function(pages) {
-            var _this = this;
-            pages.each(function() {
-                var _dom = $(this);
-                if (_dom.hasClass('recycle')) {
-                    _this._getPageDom(_dom.data('page'), function(renderhtml) {
-                        _dom.append(renderhtml);
-                        _dom.css('height', 'auto');
-                        _dom.removeClass('recycle');
-                        _this.loadDone();
+        reloadData: function () {
+            var self     = this,
+                curpages = self._getPageItemOffset($('.infinitelist-page').first().height());
+            console.log(curpages);
+            if (curpages.min > 0 && curpages.max > 0) {
+                delete self._pageListData[curpages.min];
+                delete self._pageListData[curpages.max];
+                if (curpages.max === curpages.min) {
+                    self._getPageDom(curpages.min, function (_renderhtml) {
+                        $('.infinitelist-pageindex' + curpages.min).html(_renderhtml);
+                    });
+                } else {
+                    self._getPageDom(curpages.min, function (_renderhtml) {
+                        $('.infinitelist-pageindex' + curpages.min).html(_renderhtml);
+                    });
+                    self._getPageDom(curpages.max, function (_renderhtml) {
+                        $('.infinitelist-pageindex' + curpages.max).html(_renderhtml);
                     });
                 }
-            });
-        },
-        _recyclePage: function(recyclepages, deletepages) {
-            var _this = this;
-
-            recyclepages.each(function() {
-                var _dom = $(this);
-                if (!_dom.hasClass('recycle')) {
-                    _dom.addClass('recycle');
-                    _dom.css('height', _dom.height() + 'px');
-                    _dom.html('');
-                }
-            });
-
-            //是否回收列表数据
-
-            deletepages.each(function() {
-                var _dom = $(this),
-                    _index = _dom.data('page');
-
-                if (_this._pageindex >= ~~_dom.data('page')) {
-                    _this._pageindex = ~~_dom.data('page') - 1;
-                }
-                if (_this._recycle) {
-                    delete _this._pageListData[_index];
-                }
-            });
-
-            //尾部的页面删除
-            deletepages.remove();
-        },
-        //删除指定页面的数据
-        reloadData: function(elem) {
-            var _this = this,
-                page = _this._listContainer.find(elem),
-                curindex = page.length ? page.parents('.infinitelist-page').data('page') : 0;
-
-            if (curindex > 0) {
-                //删除当前页数据
-                delete _this._pageListData[curindex];
-                _this._getPageDom(curindex, function(renderhtml) {
-                    $('.infinitelist-pageindex' + curindex).html(renderhtml);
-                    _this._loading.hide();
-                });
             }
         },
-        //清空当前页面状态,重新加载数据
-        clear: function() {
+        clear: function () {
             this._listContainer.empty();
-            this._pageindex = 0;
+            this._listLoading.show();
+            this._pageIndex = 1;
             this._pageListData = {};
-            this._nomoretag = false;
-            if (this.nomore) {
-                this.nomore.remove();
-            }
+            this._sign_nomore = false;
+            this._sign_rendering = false;
             this._loadPage();
         }
     };
 
-    window.InfiniteList = infinitelist;
-})();
+    return infinitelist;
+})());
