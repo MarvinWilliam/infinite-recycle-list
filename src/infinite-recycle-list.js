@@ -1,14 +1,12 @@
-(function (infinitelist) {
-    if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
-        define(function () {
-            return infinitelist;
-        });
-    } else if (typeof module !== 'undefined' && module.exports) {
-        module.exports = infinitelist;
+(function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        define(['Zepto'], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        module.exports = factory(require('Zepto'));
     } else {
-        window.InfiniteList = infinitelist;
+        root.InfiniteList = factory(root.Zepto);
     }
-})((function () {
+})(this, function ($) {
     function noop() {
     }
 
@@ -310,4 +308,4 @@
     };
 
     return infinitelist;
-})());
+});
