@@ -9,6 +9,10 @@
 })(this, function($) {
     function noop() {}
 
+    function _isArray() {
+        return toString.call(obj) === '[object Array]';
+    }
+
     function _listnomore() {
         return '<div style="text-align: center;padding: 10px 0;">No more</div>';
     }
@@ -260,14 +264,21 @@
                 calbak(self._pageListData[pageindex]);
             } else {
                 self._dataLoader(pageindex, self._pageSize, function success(datalist) {
-                    if (pageindex === 1 && datalist.length === 0) {
+                    if (pageindex === 1 && (!datalist || !datalist.length)) {
                         self._listContainer.append($(self._listNomore()));
                     }
-                    if (datalist.length < self._pageSize) {
-                        self._listLoading.hide();
-                        self._nomoretag = true;
+                    if (_isArray(datalist)) {
+                        if (datalist.length < self._pageSize) {
+                            self._listLoading.hide();
+                            self._nomoretag = true;
+                        }
+                    } else {
+                        if (!datalist) {
+                            self._listLoading.hide();
+                            self._nomoretag = true;
+                        }
                     }
-                    if (datalist.length != 0) {
+                    if ((_isArray(datalist) && datalist.length != 0) || (!_isArray(datalist) && !datalist)) {
                         self._pageListData[pageindex] = datalist;
                     }
                     calbak(datalist);
