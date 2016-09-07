@@ -270,12 +270,12 @@
                     if (_isArray(datalist)) {
                         if (datalist.length < self._pageSize) {
                             self._listLoading.hide();
-                            self._nomoretag = true;
+                            self._sign_nomore = true;
                         }
                     } else {
                         if (!datalist) {
                             self._listLoading.hide();
-                            self._nomoretag = true;
+                            self._sign_nomore = true;
                         }
                     }
                     if ((_isArray(datalist) && datalist.length != 0) || (!_isArray(datalist) && !datalist)) {
