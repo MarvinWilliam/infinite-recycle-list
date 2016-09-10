@@ -267,22 +267,20 @@
                     if (pageindex === 1 && (!datalist || !datalist.length)) {
                         self._listContainer.append($(self._listNomore()));
                     }
-                    if (_isArray(datalist)) {
-                        if (datalist.length < self._pageSize) {
-                            self._listLoading.hide();
-                            self._sign_nomore = true;
-                        }
-                    } else {
-                        if (!datalist) {
-                            self._listLoading.hide();
-                            self._sign_nomore = true;
-                        }
+                    if ((_isArray(datalist) && datalist.length < self._pageSize) || !datalist) {
+                        self._listLoading.hide();
+                        self._sign_nomore = true;
                     }
                     if ((_isArray(datalist) && datalist.length != 0) || (!_isArray(datalist) && !datalist)) {
                         self._pageListData[pageindex] = datalist;
                     }
                     calbak(datalist);
                 }, function error() {
+                    if (pageindex === 1 && (!datalist || !datalist.length)) {
+                        self._listContainer.append($(self._listNomore()));
+                    }
+                    self._listLoading.hide();
+                    self._sign_nomore = true;
                     calbak([]);
                 });
             }
