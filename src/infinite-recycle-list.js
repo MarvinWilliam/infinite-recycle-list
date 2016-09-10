@@ -283,6 +283,8 @@
                     }
                     calbak(datalist);
                 }, function error() {
+                    self._listLoading.hide();
+                    self._sign_nomore = true;
                     calbak([]);
                 });
             }
