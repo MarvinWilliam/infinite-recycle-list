@@ -147,6 +147,7 @@
                     self._pageIndex = ~~proname + 1;
                 }
                 sessionStorage.removeItem(self._cacheKey);
+                self._loadDone();
             } else {
                 this._loadPage();
             }
