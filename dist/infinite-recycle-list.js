@@ -277,7 +277,7 @@
                     }
                     calbak(datalist);
                 }, function error() {
-                    if (pageindex === 1 && (!datalist || !datalist.length)) {
+                    if (pageindex === 1) {
                         self._listContainer.append($(self._listNomore()));
                     }
                     self._listLoading.hide();
