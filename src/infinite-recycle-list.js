@@ -108,6 +108,7 @@
                     if (self._pageCache) {
                         self._cacheData();
                     }
+                    self._loadDone();
                 });
             }
 
@@ -118,7 +119,12 @@
             }
 
             //先处理内容 然后在绑定事件
-            $(window).on('scroll', listener);
+            $(window).on('scroll', function (event) {
+                var self = this;
+                setTimeout(function () {
+                    listener.call(self, event);
+                });
+            });
         },
         _resumeData: function () {
             var self = this;
@@ -178,11 +184,13 @@
             //正在加载页面,阻止其他的页面滚动请求
             self._sign_rendering = true;
             self._getPageDom(pageindex, function (_renderhtml) {
-                self._listContainer.append($('<div/>', {
-                    'class': 'infinitelist-page infinitelist-pageindex' + pageindex + ' clearfix',
-                    'data-page': pageindex
-                }).html(_renderhtml));
-                self._sign_rendering = false;
+                if (_renderhtml) {
+                    self._listContainer.append($('<div/>', {
+                        'class': 'infinitelist-page infinitelist-pageindex' + pageindex + ' clearfix',
+                        'data-page': pageindex
+                    }).html(_renderhtml));
+                    self._sign_rendering = false;
+                }
                 self._loadDone();
             });
         },
@@ -200,7 +208,7 @@
                 keepsize = Math.ceil(this._pageKeepSize / 2);
             if (pages.length > this._pageKeepSize) {
                 this._recyclePage(pages.slice(0, curpage - keepsize), pages.slice(curpage + keepsize, pages.length));
-                this._resumePage(pages.slice(curpage - keepsize, curpage + keepsize));
+                this._resumePage(pages.slice(curpage > keepsize ? (curpage - keepsize) : 0, curpage + keepsize));
             } else {
                 this._resumePage(pages);
             }
