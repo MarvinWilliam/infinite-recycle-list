@@ -11,11 +11,7 @@
     }
 
     function _isArray(obj) {
-        return toString.call(obj) === '[object Array]';
-    }
-
-    function _listnomore() {
-        return '<div style="text-align: center;padding: 10px 0;">No more</div>';
+        return Object.prototype.toString.call(obj) === '[object Array]';
     }
 
     /**
@@ -46,13 +42,13 @@
      * reloadData:Function, //Reload page data.
      * clear:Function,  //Clear list data.
      */
-    function infinitelist(options) {
+    var infinitelist = function _infinitelist(options) {
         if (!options) {
             console.warn('Infinitelist init options can not be null!');
             return;
         }
         this._setOptions(options);
-    }
+    };
 
     infinitelist.prototype = {
         _setOptions: function (options) {
@@ -79,7 +75,9 @@
             this._pageKeepSize = options.pageKeepSize || 6;
             this._recycle = !!options.recycle;
             this._pageCache = !!options.pageCache;
-            this._listNomore = options.listNomore || _listnomore;
+            this._listNomore = options.listNomore || function () {
+                    return '<div style="text-align:center;padding:10px 0;">No more</div>';
+                };
             this._listLoading = $(options.listLoading || '<div style="text-align: center;padding: 10px 0;">Loading...</div>');
             this._loadDone = options.loadDone || noop;
             this._cacheKey = options.storageName || 'INFINITELISTCACHE';
@@ -108,7 +106,6 @@
                     if (self._pageCache) {
                         self._cacheData();
                     }
-                    self._loadDone();
                 });
             }
 
@@ -147,21 +144,27 @@
                 }
             }
 
-            if (sessionStorage && sessionStorage.getItem(this._cacheKey)) {
-                var _cacheData = JSON.parse(sessionStorage.getItem(this._cacheKey)),
-                    proname    = '';
-                for (proname in _cacheData) {
-                    var _item = _cacheData[proname];
-                    getPage(~~proname, _item, function (dom) {
-                        self._listContainer.append(dom);
-                    });
-                    self._pageIndex = ~~proname + 1;
+            if (sessionStorage) {
+                var _pagedata = sessionStorage.getItem(this._cacheKey);
+                if (_pagedata) {
+                    var _cacheData = JSON.parse(_pagedata),
+                        proname;
+                    for (proname in _cacheData) {
+                        if (_cacheData.hasOwnProperty(proname)) {
+                            var _item    = _cacheData[proname],
+                                _proname = parseInt(proname);
+                            getPage(_proname, _item, function (dom) {
+                                self._listContainer.append(dom);
+                            });
+                            self._pageIndex = _proname + 1;
+                        }
+                    }
+                    sessionStorage.removeItem(self._cacheKey);
+                    self._loadDone();
+                    return;
                 }
-                sessionStorage.removeItem(self._cacheKey);
-                self._loadDone();
-            } else {
-                this._loadPage();
             }
+            this._loadPage();
         },
         _cacheData: function () {
             if (sessionStorage) {
