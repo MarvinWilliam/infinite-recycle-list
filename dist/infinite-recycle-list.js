@@ -1,4 +1,4 @@
-(function(root, factory) {
+(function (root, factory) {
     if (typeof define === 'function' && define.amd) {
         define(['Zepto'], factory);
     } else if (typeof module === 'object' && module.exports) {
@@ -6,15 +6,12 @@
     } else {
         root.InfiniteList = factory(root.Zepto);
     }
-})(this, function($) {
-    function noop() {}
-
-    function _isArray(obj) {
-        return toString.call(obj) === '[object Array]';
+})(this, function ($) {
+    function noop() {
     }
 
-    function _listnomore() {
-        return '<div style="text-align: center;padding: 10px 0;">No more</div>';
+    function _isArray(obj) {
+        return Object.prototype.toString.call(obj) === '[object Array]';
     }
 
     /**
@@ -45,16 +42,16 @@
      * reloadData:Function, //Reload page data.
      * clear:Function,  //Clear list data.
      */
-    function infinitelist(options) {
+    var infinitelist = function _infinitelist(options) {
         if (!options) {
             console.warn('Infinitelist init options can not be null!');
             return;
         }
         this._setOptions(options);
-    }
+    };
 
     infinitelist.prototype = {
-        _setOptions: function(options) {
+        _setOptions: function (options) {
             if (!options.listId) {
                 console.warn('Options-listId can not be null!');
                 return;
@@ -78,7 +75,9 @@
             this._pageKeepSize = options.pageKeepSize || 6;
             this._recycle = !!options.recycle;
             this._pageCache = !!options.pageCache;
-            this._listNomore = options.listNomore || _listnomore;
+            this._listNomore = options.listNomore || function () {
+                    return '<div style="text-align:center;padding:10px 0;">No more</div>';
+                };
             this._listLoading = $(options.listLoading || '<div style="text-align: center;padding: 10px 0;">Loading...</div>');
             this._loadDone = options.loadDone || noop;
             this._cacheKey = options.storageName || 'INFINITELISTCACHE';
@@ -91,7 +90,7 @@
 
             this._initList();
         },
-        _initList: function() {
+        _initList: function () {
             var self = this;
             self._listContainer = $('<div/>', {
                 class: 'infinitelist-container'
@@ -103,62 +102,77 @@
                 if ((self._threshold > bottom - window.scrollY - window.innerHeight) && !self._sign_rendering && !self._sign_nomore) {
                     self._loadPage();
                 }
-                self._updatePage(function() {
+                self._updatePage(function () {
                     if (self._pageCache) {
                         self._cacheData();
                     }
                 });
             }
 
-            $(window).on('scroll', listener);
-
             if (self._pageCache) {
                 self._resumeData();
             } else {
                 self._loadPage();
             }
+
+            //先处理内容 然后在绑定事件
+            $(window).on('scroll', function (event) {
+                var self = this;
+                setTimeout(function () {
+                    listener.call(self, event);
+                });
+            });
         },
-        _resumeData: function() {
+        _resumeData: function () {
             var self = this;
 
             function getPage(index, page, calbak) {
                 var _dom = $('<div/>', {
-                    'class': 'infinitelist-page infinitelist-pageindex' + index + ' recycled clearfix',
+                    'class': 'infinitelist-page infinitelist-pageindex' + index + ' clearfix',
                     'data-page': index
                 });
                 if (page.cycled) {
-                    calbak(_dom.css('height', page.data));
+                    calbak(_dom.addClass('recycled').css('height', page.data));
                 } else {
                     self._pageListData[index] = page.data;
-                    self._getPageDom(index, function(_renderhtml) {
+                    if (page.data.length < self._pageSize) {
+                        self.noMore();
+                    }
+                    self._getPageDom(index, function (_renderhtml) {
                         calbak(_dom.html(_renderhtml));
                     });
                 }
             }
 
-            if (sessionStorage && sessionStorage.getItem(this._cacheKey)) {
-                var _cacheData = JSON.parse(sessionStorage.getItem(this._cacheKey)),
-                    proname = '';
-                for (proname in _cacheData) {
-                    var _item = _cacheData[proname];
-                    getPage(~~proname, _item, function(dom) {
-                        self._listContainer.append(dom);
-                    });
-                    self._pageIndex = ~~proname + 1;
+            if (sessionStorage) {
+                var _pagedata = sessionStorage.getItem(this._cacheKey);
+                if (_pagedata) {
+                    var _cacheData = JSON.parse(_pagedata),
+                        proname;
+                    for (proname in _cacheData) {
+                        if (_cacheData.hasOwnProperty(proname)) {
+                            var _item    = _cacheData[proname],
+                                _proname = parseInt(proname);
+                            getPage(_proname, _item, function (dom) {
+                                self._listContainer.append(dom);
+                            });
+                            self._pageIndex = _proname + 1;
+                        }
+                    }
+                    sessionStorage.removeItem(self._cacheKey);
+                    self._loadDone();
+                    return;
                 }
-                sessionStorage.removeItem(self._cacheKey);
-                self._loadDone();
-            } else {
-                this._loadPage();
             }
+            this._loadPage();
         },
-        _cacheData: function() {
+        _cacheData: function () {
             if (sessionStorage) {
                 var _tempCache = {},
-                    self = this;
-                $('.infinitelist-page').each(function() {
+                    self       = this;
+                $('.infinitelist-page').each(function () {
                     var _pageindex = $(this).data('page'),
-                        _cycled = $(this).hasClass('recycled');
+                        _cycled    = $(this).hasClass('recycled');
                     _tempCache[_pageindex] = {
                         cycled: _cycled,
                         data: _cycled ? $(this).css('height') : self._pageListData[_pageindex]
@@ -167,55 +181,48 @@
                 sessionStorage.setItem(self._cacheKey, JSON.stringify(_tempCache));
             }
         },
-        _loadPage: function() {
-            var self = this,
+        _loadPage: function () {
+            var self      = this,
                 pageindex = self._pageIndex++;
             //正在加载页面,阻止其他的页面滚动请求
             self._sign_rendering = true;
-            self._getPageDom(pageindex, function(_renderhtml) {
-                self._listContainer.append($('<div/>', {
-                    'class': 'infinitelist-page infinitelist-pageindex' + pageindex + ' clearfix',
-                    'data-page': pageindex
-                }).html(_renderhtml));
-                self._sign_rendering = false;
+            self._getPageDom(pageindex, function (_renderhtml) {
+                if (_renderhtml) {
+                    self._listContainer.append($('<div/>', {
+                        'class': 'infinitelist-page infinitelist-pageindex' + pageindex + ' clearfix',
+                        'data-page': pageindex
+                    }).html(_renderhtml));
+                    self._sign_rendering = false;
+                }
                 self._loadDone();
             });
         },
-        _getPageItemOffset: function(pageheight) {
+        _getPageItemOffset: function (pageheight) {
             var curpage = (window.scrollY + window.innerHeight / 2 - this._listContainer.offset().top) / pageheight;
-
-            if (pageheight > window.innerHeight) {
-                var prop = 1 - window.innerHeight / pageheight,
-                    _temp = Math.floor(curpage);
-
-                if (_temp + 0.5 + prop > curpage && _temp + 0.5 - prop < curpage) {
-                    curpage = _temp;
-                }
-            }
 
             return {
                 min: Math.floor(curpage),
                 max: Math.ceil(curpage)
             };
         },
-        _updatePage: function(calbak) {
-            var pages = this._listContainer.find('.infinitelist-page'),
-                curpage = this._getPageItemOffset(pages.first().height()).max,
+        _updatePage: function (calbak) {
+            var pages    = this._listContainer.find('.infinitelist-page'),
+                curpage  = this._getPageItemOffset(pages.first().height()).max,
                 keepsize = Math.ceil(this._pageKeepSize / 2);
             if (pages.length > this._pageKeepSize) {
                 this._recyclePage(pages.slice(0, curpage - keepsize), pages.slice(curpage + keepsize, pages.length));
-                this._resumePage(pages.slice(curpage - keepsize, curpage + keepsize));
+                this._resumePage(pages.slice(curpage > keepsize ? (curpage - keepsize) : 0, curpage + keepsize));
             } else {
                 this._resumePage(pages);
             }
             calbak();
         },
-        _resumePage: function(pages) {
+        _resumePage: function (pages) {
             var self = this;
-            pages.each(function() {
+            pages.each(function () {
                 var _dom = $(this);
                 if (_dom.hasClass('recycled')) {
-                    self._getPageDom(_dom.data('page'), function(_renderhtml) {
+                    self._getPageDom(_dom.data('page'), function (_renderhtml) {
                         _dom.html(_renderhtml);
                         _dom.css('height', 'auto');
                         _dom.removeClass('recycled');
@@ -223,10 +230,10 @@
                 }
             });
         },
-        _recyclePage: function(recyclepages, deletepages) {
-            var self = this,
+        _recyclePage: function (recyclepages, deletepages) {
+            var self     = this,
                 delpages = [];
-            recyclepages.each(function() {
+            recyclepages.each(function () {
                 var _dom = $(this);
                 if (!_dom.hasClass('recycled')) {
                     _dom.addClass('recycled');
@@ -235,8 +242,8 @@
                 }
             });
 
-            deletepages.each(function() {
-                var _dom = $(this),
+            deletepages.each(function () {
+                var _dom   = $(this),
                     _index = _dom.data('page');
                 delpages.push(_index);
                 if (self._recycle) {
@@ -245,20 +252,20 @@
             });
 
             if (delpages.length > 0) {
-                self._pageIndex = delpages.reduce(function(prev, cur) {
+                self._pageIndex = delpages.reduce(function (prev, cur) {
                     return prev > cur ? cur : prev;
                 });
             }
 
             deletepages.remove();
         },
-        _getPageDom: function(pageindex, calbak) {
+        _getPageDom: function (pageindex, calbak) {
             var self = this;
-            self._getData(pageindex, function(data) {
+            self._getData(pageindex, function (data) {
                 calbak(self._htmlRender(data));
             });
         },
-        _getData: function(pageindex, calbak) {
+        _getData: function (pageindex, calbak) {
             var self = this;
             //如果缓存中存在数据则直接取缓存中的数据,没有请求服务器,并保存在缓存中
             if (self._pageListData[pageindex]) {
@@ -269,8 +276,7 @@
                         self._listContainer.append($(self._listNomore()));
                     }
                     if ((_isArray(datalist) && datalist.length < self._pageSize) || !datalist) {
-                        self._listLoading.hide();
-                        self._sign_nomore = true;
+                        self.noMore();
                     }
                     if ((_isArray(datalist) && datalist.length != 0) || (!_isArray(datalist) && !datalist)) {
                         self._pageListData[pageindex] = datalist;
@@ -280,34 +286,46 @@
                     if (pageindex === 1) {
                         self._listContainer.append($(self._listNomore()));
                     }
-                    self._listLoading.hide();
-                    self._sign_nomore = true;
+                    self.noMore();
                     calbak([]);
                 });
             }
         },
-        reloadData: function() {
-            var self = this,
+        reloadData: function () {
+            var self     = this,
                 curpages = self._getPageItemOffset($('.infinitelist-page').first().height());
             console.log(curpages);
-            if (curpages.min > 0 && curpages.max > 0) {
+            if (curpages.min >= 0 && curpages.max > 0) {
                 delete self._pageListData[curpages.min];
                 delete self._pageListData[curpages.max];
                 if (curpages.max === curpages.min) {
-                    self._getPageDom(curpages.min, function(_renderhtml) {
+                    self._sign_rendering = true;
+                    self._getPageDom(curpages.min, function (_renderhtml) {
                         $('.infinitelist-pageindex' + curpages.min).html(_renderhtml);
+                        self._sign_rendering = false;
+                        self._loadDone();
                     });
                 } else {
-                    self._getPageDom(curpages.min, function(_renderhtml) {
+                    self._sign_rendering = true;
+                    self._getPageDom(curpages.min, function (_renderhtml) {
                         $('.infinitelist-pageindex' + curpages.min).html(_renderhtml);
+                        self._sign_rendering = false;
+                        self._loadDone();
                     });
-                    self._getPageDom(curpages.max, function(_renderhtml) {
+                    self._getPageDom(curpages.max, function (_renderhtml) {
                         $('.infinitelist-pageindex' + curpages.max).html(_renderhtml);
+                        self._sign_rendering = false;
+                        self._loadDone();
                     });
                 }
+
             }
         },
-        clear: function() {
+        noMore: function () {
+            this._sign_nomore = true;
+            this._listLoading.hide();
+        },
+        clear: function () {
             this._listContainer.empty();
             this._listLoading.show();
             this._pageIndex = 1;
