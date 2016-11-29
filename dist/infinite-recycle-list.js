@@ -148,10 +148,12 @@
                 var _pagedata = sessionStorage.getItem(this._cacheKey);
                 if (_pagedata) {
                     var _cacheData = JSON.parse(_pagedata),
+                        _list      = _cacheData.list,
+                        _position  = parseFloat(_cacheData.position),
                         proname;
-                    for (proname in _cacheData) {
-                        if (_cacheData.hasOwnProperty(proname)) {
-                            var _item    = _cacheData[proname],
+                    for (proname in _list) {
+                        if (_list.hasOwnProperty(proname)) {
+                            var _item    = _list[proname],
                                 _proname = parseInt(proname);
                             getPage(_proname, _item, function (dom) {
                                 self._listContainer.append(dom);
@@ -161,6 +163,9 @@
                     }
                     sessionStorage.removeItem(self._cacheKey);
                     self._loadDone();
+                    setTimeout(function () {
+                        window.scrollTo(0, _position);
+                    });
                     return;
                 }
             }
@@ -168,16 +173,21 @@
         },
         _cacheData: function () {
             if (sessionStorage) {
-                var _tempCache = {},
-                    self       = this;
+                var _tempCache,
+                    _list = {},
+                    self  = this;
                 $('.infinitelist-page').each(function () {
                     var _pageindex = $(this).data('page'),
                         _cycled    = $(this).hasClass('recycled');
-                    _tempCache[_pageindex] = {
+                    _list[_pageindex] = {
                         cycled: _cycled,
                         data: _cycled ? $(this).css('height') : self._pageListData[_pageindex]
                     };
                 });
+                _tempCache = {
+                    position: window.scrollY,
+                    list: _list
+                };
                 sessionStorage.setItem(self._cacheKey, JSON.stringify(_tempCache));
             }
         },
